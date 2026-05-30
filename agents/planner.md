@@ -22,6 +22,22 @@ Use `AskUserQuestion` to cover these — combine into 2-4 questions max:
 - **UI surface**: New route/page, new tab, new panel/modal, or extend an existing component?
 - **Migration risk**: Does this touch existing rows or columns that already have production data?
 
+## Additional questions for visual output features
+
+If the feature generates a **visual output** — a slide deck, PDF, chart, report, or any pixel-positioned layout — ask these **before planning the layout**:
+
+- **Reference asset**: "Do you have a reference file (screenshot, PDF, existing PPT) that shows the exact target layout? Please share it — I need to see it visually before planning coordinates or structure."
+- **Fidelity**: "Should the output match the reference pixel-for-pixel, or is it an approximation?"
+- **Overflow handling**: "If content overflows a fixed-size section, should it be clipped, paginated, or scaled?"
+
+**Why this matters — lesson learned:**
+Attempting to infer visual layout from file metadata (XML, JSON, text extraction) is unreliable:
+- Row vs. column orientation cannot be determined from text order alone
+- Section positioning and layering is invisible in extracted text
+- Colour, font size, and visual hierarchy are lost in extraction
+Always get a screenshot or image and use the `Read` tool to view it directly before designing any layout.
+Do not plan coordinates, column counts, or section order until the reference image has been seen and confirmed.
+
 ## Plan file format
 
 Write the plan to `.claude/plans/<kebab-feature-name>.md`:
@@ -44,6 +60,13 @@ Write the plan to `.claude/plans/<kebab-feature-name>.md`:
 - Service updates: new signals, HTTP calls
 - RBAC guards: which canXxx computed signal controls this
 - Template: key elements (tabs, buttons, forms)
+
+## Visual Layout (for PPT/PDF/report features only)
+- Reference image: confirmed visually via screenshot (file path or user-shared image)
+- Sections and their coordinates (in inches for PPT, px for web)
+- Row vs. column orientation explicitly stated for every table/grid
+- Colours confirmed from the reference (hex codes)
+- Data mapping: which app data populates which visual section
 
 ## DB / Migration Changes
 - Table/column changes

@@ -11,6 +11,56 @@ Read `CLAUDE.md` for the project's feature module locations and service patterns
 
 ---
 
+## REQUIRED: Get a reference screenshot before writing any slide code
+
+If the user has provided a reference PPT file or wants to match an existing layout:
+
+**Always ask for a screenshot first. Never infer layout from anything else.**
+
+```
+"Before I write coordinates, I need to see the reference visually.
+Can you share a screenshot of the slide(s) you want to match?"
+```
+
+Then use the `Read` tool on the image file to view it directly:
+```typescript
+// Read tool accepts image paths (PNG, JPG, etc.)
+// View the screenshot to confirm every layout detail visually
+```
+
+### Why XML/text extraction is not enough — lesson learned
+
+Extracting text from a PPTX file (unzipping and reading slide XML) gives you text content and rough coordinates, but it **cannot reliably tell you**:
+- Whether labels are row headers or column headers in a table
+- Which sections overlay or layer on top of each other
+- Visual grouping and alignment that exists only in the rendered slide
+- The actual colour of fills (theme references vs. hex values differ)
+- Whether a section is a text box or a table cell
+
+**Concretely:** "Business Leader | Product Owner | Tech Delivery Owner" extracted as a text sequence looks identical whether it is a single-column list (one label per row) or a five-column table header (all labels in one row). Only the rendered screenshot makes this unambiguous.
+
+### Before writing any `renderSlide()` code, confirm all of these visually:
+
+| Question | Why it can't be inferred from XML |
+|---|---|
+| Are role labels columns or rows? | Text order in XML follows DOM, not visual direction |
+| Are Overall/Scope/Schedule table columns or row labels? | Same reason |
+| Which sections are side-by-side vs. stacked? | Overlapping shapes have unordered XML positions |
+| What are the exact background colours? | Theme refs like `dk1`, `lt1` don't map to hex without theme file |
+| Is the footer above or below a table? | Z-order and y-position both matter; text extraction only gives y |
+
+### Workflow for pixel-to-pixel matching
+
+1. User shares reference `.pptx` file
+2. **Ask for a screenshot** — do not skip this step
+3. Use `Read` tool to view the screenshot image
+4. Confirm with the user: describe what you see section by section and ask them to verify
+5. Only after visual confirmation: extract exact coordinates from PPTX XML as a cross-check
+6. Write coordinates; show the user an ASCII layout diagram and ask for confirmation before coding
+7. After generating the PPT, ask the user to compare visually and report any differences
+
+---
+
 ## Library
 
 ```json
@@ -81,6 +131,36 @@ slide.addText([
 
 ---
 
+## Tables
+
+Use `addTable` for any grid with headers, coloured cells, or multi-column data.
+Cell options allow per-cell fill, colour, font, alignment:
+
+```typescript
+const rows = [
+  // Header row
+  [
+    { text: 'Col A', options: { bold: true, color: 'FFFFFF', fill: { color: '07316D' }, fontSize: 9 } },
+    { text: 'Col B', options: { bold: true, color: 'FFFFFF', fill: { color: '07316D' }, fontSize: 9 } },
+  ],
+  // Data row
+  [
+    { text: 'value 1', options: { fontSize: 9, color: '1F1F1F' } },
+    { text: 'G', options: { bold: true, fontSize: 10, color: 'FFFFFF', fill: { color: '00B050' } } },
+  ],
+];
+
+slide.addTable(rows as any[][], {   // cast to any[][] to avoid TS union type errors
+  x: 0, y: 1.5, w: 13.26, h: 1.4,
+  border: { type: 'solid', pt: 0.5, color: 'AAAAAA' },
+  colW: [4.0, 2.0],  // must sum to w
+});
+```
+
+**Important:** TypeScript will infer a strict union type from mixed cell option shapes. Always declare data row arrays as `any[][]` or cast the full argument with `as any[][]`.
+
+---
+
 ## Background fill on a text box
 
 ```typescript
@@ -107,8 +187,6 @@ function estimateHeight(text: string, fontSize: number, boxWidth: number): numbe
   return lines * lineHeightInches;
 }
 ```
-
-Use this to decide whether to place content in the current slot or overflow to the next slide.
 
 ---
 
@@ -195,7 +273,7 @@ Template button:
 ## Reference implementation
 
 The complete working example is in the Synerghub UI repo:
-- `src/app/features/projects/components/qbr-report/qbr-report.ts` — full generation logic (500 lines)
-- `src/app/features/projects/components/qbr-report/qbr-report.html` — template with export button and preview cards
+- `src/app/features/projects/components/qbr-report/qbr-report.ts` — full generation logic
+- `src/app/features/projects/components/weekly-report/weekly-report.ts` — pixel-matched layout with `addTable` for headers, health grid, issues, risks, and deliverables
 
-Read it before building a new report feature to reuse the header/footer helpers and slot pagination logic.
+Read these before building a new report feature to reuse patterns.
