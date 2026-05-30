@@ -110,7 +110,103 @@ In the editor — disable fields, hide save button:
 }
 ```
 
-## PrimeNG
+## TypeScript type inference — common pitfalls
+
+### 1. Heterogeneous object-literal arrays → strict union type
+
+When you build an array from object literals with different optional properties, TypeScript infers a union type from the first element. Adding a property later that isn't on every union member causes an error.
+
+```typescript
+// ✗ Fails — TypeScript infers options type from the first .map(), then rejects
+//   the `italic: true` in the fallback push() call
+const rows = items.map((x) => [
+  { text: x.name, options: { bold: true, fontSize: 9 } },
+]);
+rows.push([{ text: 'none', options: { fontSize: 9, italic: true } }]); // TS error
+
+// ✓ Declare the variable as any[][] upfront — one annotation, no casts needed
+const rows: any[][] = items.map((x) => [
+  { text: x.name, options: { bold: true, fontSize: 9 } },
+]);
+rows.push([{ text: 'none', options: { fontSize: 9, italic: true } }]); // OK
+```
+
+Similarly, when passing a mixed-type array to an external library call (e.g. `addTable`):
+```typescript
+// ✓ Cast at the call site
+slide.addTable([headerRow, ...dataRows] as any[][], { ... });
+```
+
+**Rule:** When an array is built from heterogeneous objects or populated after construction, declare it as `any[]` or `any[][]`. Only use `as any[][]` casts at call sites when you can't annotate the variable.
+
+---
+
+### 2. `$any()` in templates is not always enough
+
+Angular's strict template type checker sometimes rejects `$any()` casts for indexed access on typed objects (e.g. `obj[$any(key)]`), even though the equivalent works in `.ts` files.
+
+```html
+<!-- ✗ Angular strict mode may still error -->
+[ngModel]="getHealth(id)[$any(field)]"
+
+<!-- ✓ Add a typed helper method in the component class -->
+[ngModel]="getHealthField(id, $any(field))"
+```
+
+```typescript
+// In the component .ts — narrow the type so the template call is unambiguous
+protected getHealthField(id: string, field: keyof Omit<MyType, 'id'>): ValueType {
+  return this.getData(id)[field];
+}
+```
+
+**Rule:** If a template expression requires an indexed access on a typed object, move the logic into a typed component method. Never rely solely on `$any()` for indexed access.
+
+---
+
+### 3. `effect()` + `untracked()` for reactive signal initialization
+
+When signal A should be reset whenever signal B changes, use `effect` + `untracked` to avoid reactive loops:
+
+```typescript
+constructor() {
+  // Re-initialise selectedIds whenever the project list changes (e.g. team filter)
+  effect(() => {
+    const ids = new Set(this.activeProjects().map((p) => p.id));
+    untracked(() => this.selectedIds.set(ids)); // write without registering as dependency
+  });
+}
+```
+
+**Rule:** Reads inside `effect()` are reactive dependencies. Writes to signals inside `effect()` must be wrapped in `untracked()` or they trigger infinite loops.
+
+---
+
+### 4. Records cannot support presence-flag PATCH DTOs
+
+Java records generate accessor methods (`.field()`) and are immutable — they cannot have the `@JsonSetter` + boolean flag pattern needed to distinguish `null` (clear the field) from absent (leave unchanged).
+
+If a PATCH field needs to be clearable to `null`, the DTO **must be a class**, not a record:
+
+```java
+// ✗ Record — cannot distinguish null-sent from not-sent
+public record MyPatchRequest(String name, String ownerId) {}
+
+// ✓ Class with presence flag — null-sent clears the value
+public class MyPatchRequest {
+    private String ownerId;
+    private boolean ownerIdPresent;
+
+    @JsonSetter("ownerId")
+    public void setOwnerId(String v) { this.ownerId = v; this.ownerIdPresent = true; }
+    public boolean isOwnerIdPresent() { return ownerIdPresent; }
+    public String getOwnerId() { return ownerId; }
+}
+```
+
+When converting an existing record to a class, also update all call sites that used record-style accessors (`.field()`) to getter-style (`.getField()`).
+
+---
 
 ```typescript
 imports: [TooltipModule]
