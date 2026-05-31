@@ -228,3 +228,67 @@ src/app/features/<feature>/
   models/
     <name>.ts
 ```
+
+---
+
+## Dark mode in component SCSS — critical rule
+
+### Always use `:host-context(.app-dark)`, never `:root.app-dark`
+
+Angular's view encapsulation adds `[_ngcontent-xxx]` attribute selectors to every rule
+in a component's `.scss` file. `:root.app-dark .my-class` becomes
+`:root.app-dark .my-class[_ngcontent-xxx]`, which silently fails to match.
+`:host-context(.app-dark)` is the only form that survives encapsulation correctly.
+
+```scss
+/* ✗ WRONG — dark override silently ignored in component styles */
+:root.app-dark {
+  .notif-item--pending { background: #3f1f1f; }
+}
+
+/* ✓ CORRECT */
+:host-context(.app-dark) {
+  .notif-item--pending { background: #3f1f1f; }
+}
+```
+
+### Prefer CSS custom properties over hardcoded hex for semantic colours
+
+When a colour carries semantic meaning (error, warning, hover feedback), use a custom
+property so both light and dark modes are handled by the global theme, not a per-component
+override block.
+
+```scss
+/* ✗ Requires a manual dark override for every component that uses it */
+.notif-item { background: #fef2f2; }
+
+/* ✓ Single definition in styles.scss covers all components in all modes */
+.notif-item { background: var(--app-error-soft); }
+```
+
+If the required token doesn't exist yet, add it to `styles.scss` with light and dark
+values rather than hardcoding hex in the component.
+
+### Always define `:hover` for interactive elements
+
+Any element with `cursor: pointer` or that is clickable must have a `:hover` style.
+Use `var(--app-hover)` (already defined for both modes) as the default hover background.
+
+```scss
+/* ✗ No feedback — user can't tell the item is clickable */
+.notif-item { background: var(--app-bg); cursor: pointer; }
+
+/* ✓ */
+.notif-item {
+  background: var(--app-bg);
+  cursor: pointer;
+  &:hover { background: var(--app-hover); }
+}
+```
+
+### Dark mode checklist before committing any new component
+
+- [ ] Every background/text colour uses a CSS variable OR has a `:host-context(.app-dark)` override
+- [ ] No `:root.app-dark` in any component `.scss` file
+- [ ] Every `cursor: pointer` element has a `:hover` state
+- [ ] Switched to dark mode in browser and visually confirmed all states look correct
