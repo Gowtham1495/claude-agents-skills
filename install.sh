@@ -6,13 +6,15 @@ set -e
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 TARGET_AGENTS="$HOME/.claude/agents"
+TARGET_COMMANDS="$HOME/.claude/commands"
 TARGET_SKILLS="$HOME/.claude/skills"
 
 echo "Installing Claude agents and skills from $REPO_DIR"
 
-mkdir -p "$TARGET_AGENTS" "$TARGET_SKILLS"
+mkdir -p "$TARGET_AGENTS" "$TARGET_COMMANDS" "$TARGET_SKILLS"
 
-# Copy agents
+# Copy agents (sub-agents spawned by Claude internally)
+# Also copy to commands/ so they are user-invocable as /planner, /developer, /tester
 for file in "$REPO_DIR"/agents/*.md; do
   name="$(basename "$file")"
   if [ -f "$TARGET_AGENTS/$name" ]; then
@@ -21,6 +23,7 @@ for file in "$REPO_DIR"/agents/*.md; do
     echo "  [new]    agents/$name"
   fi
   cp "$file" "$TARGET_AGENTS/$name"
+  cp "$file" "$TARGET_COMMANDS/$name"
 done
 
 # Copy skills (each skill is a directory containing SKILL.md)
